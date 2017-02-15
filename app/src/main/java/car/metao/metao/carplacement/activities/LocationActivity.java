@@ -15,6 +15,7 @@ import android.os.Message;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
+import android.widget.Toast;
 import car.metao.metao.carplacement.R;
 import car.metao.metao.carplacement.fragments.DriverDetailFragment;
 import car.metao.metao.carplacement.model.Driver;
@@ -52,7 +53,7 @@ public class LocationActivity extends FragmentActivity implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener {
 
-    private static final String API_END_POINT = "http://192.168.1.3/website/v5/drivers.php";
+    private static final String API_END_POINT = "https://s3-us-west-2.amazonaws.com/wunderbucket/locations";
     private static final String TAG = "LocationActivity";
     private static final long INTERVAL = 1000 * 60 * 1; //1 minute
     private static final long FASTEST_INTERVAL = 1000 * 60 * 1; // 1 minute
@@ -135,6 +136,12 @@ public class LocationActivity extends FragmentActivity implements
                         createMap(placemarks);
                     }
                 }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                Toast.makeText(getBaseContext(), "Can't connect to " + throwable.getMessage(), Toast.LENGTH_LONG)
+                        .show();
             }
         });
     }
