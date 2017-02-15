@@ -9,6 +9,11 @@ public class DriverSubItem implements Serializable {
     private String itemOne;
     private String itemTwo;
 
+    public DriverSubItem(String itemOne, String itemTwo) {
+        this.itemOne = itemOne;
+        this.itemTwo = itemTwo;
+    }
+
     public String getItemOne() {
         return itemOne;
     }
