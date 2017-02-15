@@ -5,7 +5,6 @@ package car.metao.metao.carplacement.activities;
  */
 
 import android.app.Activity;
-import android.app.FragmentManager;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
@@ -34,10 +33,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.*;
 import com.google.maps.android.ui.IconGenerator;
 import com.metao.async.repository.Repository;
 import com.metao.async.repository.RepositoryCache;
@@ -73,6 +69,8 @@ public class LocationActivity extends FragmentActivity implements
     private RepositoryCache<String, Driver> driverMapCache;
     private RepositoryCache<String, String> driverMarkerMapCache;
     private RepositoryCache<String, String> markerDriverMapCache;
+    private boolean selected;
+    private SupportMapFragment fm;
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -94,15 +92,12 @@ public class LocationActivity extends FragmentActivity implements
     }
 
     private void setupFragment() {
-        FragmentManager fragmentManager = getFragmentManager();
         driverDetailFragment = new DriverDetailFragment();
-        fragmentManager.beginTransaction()
-                .add(R.id.container, driverDetailFragment, "driver_detail_fragment")
-                .addToBackStack("location").commit();
+        getFragmentManager().beginTransaction().add(R.id.container, driverDetailFragment, "driver_fragmet").commit();
         actionOnMapPresenter = new ActionOnMapPresenter();
         actionOnMapPresenter.setView(this);//Set The Presenter
         driverDetailFragment.setPresenter(actionOnMapPresenter);
-        messageHandler = new MessageHandler();
+        messageHandler = new LocationActivity.MessageHandler();
         markerDriverMapCache = new RepositoryCache<>(1024);
         driverMarkerMapCache = new RepositoryCache<>(1024);
         markerMapCache = new RepositoryCache<>(1024);
@@ -133,7 +128,7 @@ public class LocationActivity extends FragmentActivity implements
                     ArrayList<Driver> placemarks = placeMark.placemarks;
                     if (placemarks != null && placemarks.size() > 0) {
                         placemarksHolder = placeMark.placemarks;
-                        createMap(placemarks);
+                        initMap();
                     }
                 }
             }
@@ -146,37 +141,62 @@ public class LocationActivity extends FragmentActivity implements
         });
     }
 
+    private void initMap() {
+        googleMap.setOnMapLoadedCallback(new GoogleMap.OnMapLoadedCallback() {
+            @Override
+            public void onMapLoaded() {
+                if (placemarksHolder.size() > 0) {
+                    double lat = placemarksHolder.get(0).coordinates[0];
+                    double lon = placemarksHolder.get(0).coordinates[1];
+                    LatLng currentLatLng = new LatLng(lat, lon);
+                    animateTo(currentLatLng, 15, 1, 1, 1000);
+                    createMap(placemarksHolder);
+                }
+            }
+        });
+
+        googleMap.setOnCameraIdleListener(new GoogleMap.OnCameraIdleListener() {
+            @Override
+            public void onCameraIdle() {
+                if (!selected) {
+                    createMap(placemarksHolder);
+                }
+            }
+        });
+    }
+
     private void createMap(ArrayList<Driver> placemarks) {
-        for (Driver placemark : placemarks) {
-            double lat = placemark.coordinates[0];
-            double lon = placemark.coordinates[1];
-            addMarker(placemark, placemark.name, lat, lon);
-        }
-        if (placemarks.size() > 0) {
-            double lat = placemarks.get(0).coordinates[0];
-            double lon = placemarks.get(0).coordinates[1];
-            LatLng currentLatLng = new LatLng(lat, lon);
-            animateTo(currentLatLng, 13, 1, 1, 1000);
+        LatLngBounds bounds = this.googleMap.getProjection().getVisibleRegion().latLngBounds;
+        for (Driver driver : placemarks) {
+            double lat = driver.coordinates[0];
+            double lon = driver.coordinates[1];
+            if (bounds.contains(new LatLng(driver.coordinates[0], driver.coordinates[1]))) {
+                addMarker(driver, driver.name, lat, lon);
+            }
         }
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        Log.d(TAG, "onStart fired ..............");
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addApi(LocationServices.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
-        SupportMapFragment fm = (SupportMapFragment) getSupportFragmentManager()
+        fm = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
+        initService();
+        mGoogleApiClient.connect();
+    }
+
+    void initService() {
         fm.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(GoogleMap gm) {
                 googleMap = gm;
                 googleMap.getUiSettings().setZoomControlsEnabled(true);
-                googleMap.setOnMarkerClickListener(new MarkerClickHandler());
+                googleMap.setOnMarkerClickListener(new LocationActivity.MarkerClickHandler());
                 if (placeMarkRepository == null) {
                     initRepository();
                     callService();
@@ -185,15 +205,12 @@ public class LocationActivity extends FragmentActivity implements
                 }
             }
         });
-        mGoogleApiClient.connect();
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        Log.d(TAG, "onStop fired ..............");
         mGoogleApiClient.disconnect();
-        Log.d(TAG, "isConnected ...............: " + mGoogleApiClient.isConnected());
     }
 
     private boolean isGooglePlayServicesAvailable() {
@@ -242,7 +259,7 @@ public class LocationActivity extends FragmentActivity implements
         addMarker(null, "My Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
     }
 
-    private void addMarker(Driver driver, String title, double lat, double lon) {
+    private Marker addMarker(Driver driver, String title, double lat, double lon) {
         MarkerOptions options = new MarkerOptions();
         IconGenerator iconFactory = new IconGenerator(this);
         iconFactory.setStyle(IconGenerator.STYLE_PURPLE);
@@ -264,6 +281,7 @@ public class LocationActivity extends FragmentActivity implements
             animateTo(mapMarker.getPosition(), 15, 2, 1, 1000);
         }
         mapMarker.setTitle(title);
+        return mapMarker;
     }
 
     @Override
@@ -316,11 +334,6 @@ public class LocationActivity extends FragmentActivity implements
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-    }
-
     class MessageHandler extends Handler {
 
         MessageHandler() {
@@ -333,14 +346,15 @@ public class LocationActivity extends FragmentActivity implements
             if (markerId != null) {
                 Driver driver = driverMapCache.get(markerId);
                 Marker marker = markerMapCache.get(markerId);
-                if (marker != null) {
-                    animateTo(marker.getPosition(), 15, 2, 1, 1000);
-                }
                 if (driver != null) {
                     driverDetailFragment.show(true);
                     driverDetailFragment.getResultPresenter().getPresenter().updateView(driver);
+                    if(marker!= null) {
+                        animateTo(marker.getPosition(), 16, 1, 1, 2000);
+                    }
                 }
             }
+            selected = !selected;
         }
     }
 

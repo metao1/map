@@ -6,46 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * A cache that holds strong references to a limited number of values. Each time
- * a value is accessed, it is moved to the head of a queue. When a value is
- * added to a full cache, the value at the end of that queue is evicted and may
- * become eligible for garbage collection.
- * <p>
- * <p>If your cached values hold resources that need to be explicitly released,
- * override {@link #entryRemoved}.
- * <p>
- * <p>If a cache miss should be computed on demand for the corresponding keys,
- * override {@link #create}. This simplifies the calling code, allowing it to
- * assume a value will always be returned, even when there's a cache miss.
- * <p>
- * <p>By default, the cache size is measured in the number of entries. Override
- * {@link #sizeOf} to size the cache in different units. For example, this cache
- * is limited to 4MiB of bitmaps:
- * <pre>   {@code
- *   int cacheSize = 4 * 1024 * 1024; // 4MiB
- *   RepositoryCache<String, Bitmap> bitmapCache = new RepositoryCache<String, Bitmap>(cacheSize) {
- *       protected int sizeOf(String key, Bitmap value) {
- *           return value.getByteCount();
- *       }
- *   }}</pre>
- * <p>
- * <p>This class is thread-safe. Perform multiple cache operations atomically by
- * synchronizing on the cache: <pre>   {@code
- *   synchronized (cache) {
- *     if (cache.get(key) == null) {
- *         cache.put(key, value);
- *     }
- *   }}</pre>
- * <p>
- * <p>This class does not allow null to be used as a key or value. A return
- * value of null from {@link #get}, {@link #put} or {@link #remove} is
- * unambiguous: the key was not in the cache.
- * <p>
- * <p>This class appeared in Android 3.1 (Honeycomb MR1); it's available as part
- * of <a href="http://developer.android.com/sdk/compatibility-library.html">Android's
- * Support Package</a> for earlier releases.
- */
 public class RepositoryCache<K, V> {
     private final ConcurrentHashMap<K, V> map;
     /**
@@ -180,6 +140,7 @@ public class RepositoryCache<K, V> {
                 if (size <= maxSize) {
                     break;
                 }
+                map.clear();
                 Map.Entry<K, V> toEvict = null;
                 try {
                     toEvict = (Map.Entry<K, V>) map.getClass().getMethod("eldest").invoke(map);
