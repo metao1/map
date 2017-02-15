@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">CarPlacement</string>
+    <string name="title_activity_maps">Map</string>
+    <string name="search_hint">search...</string>
+    <string name="all_cars">all cars</string>
+    <string name="driver_detail">Driver Detail</string>
+    <string name="driver_detail_image">Driver Image</string>
+</resources>
